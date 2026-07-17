@@ -109,9 +109,10 @@ struct TitleDetail: Codable, Identifiable {
     let externalIds: ExternalIds?
     let lastEpisodeToAir: EpisodeBrief?
     let nextEpisodeToAir: EpisodeBrief?
+    let images: TitleImages?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, name, overview, tagline, runtime, status, genres, seasons, networks, credits, videos, recommendations, similar
+        case id, title, name, overview, tagline, runtime, status, genres, seasons, networks, credits, videos, recommendations, similar, images
         case posterPath = "poster_path"
         case backdropPath = "backdrop_path"
         case voteAverage = "vote_average"
@@ -210,6 +211,25 @@ struct EpisodeBrief: Codable, Hashable {
     }
 }
 
+struct Video: Codable, Identifiable, Hashable {
+    let id: String
+    let key: String
+    let name: String
+    let site: String
+    let type: String
+}
+
+struct TitleImages: Codable {
+    let posters: [ImageRef]?
+    let backdrops: [ImageRef]?
+}
+
+struct ImageRef: Codable, Identifiable, Hashable {
+    let filePath: String
+    var id: String { filePath }
+    enum CodingKeys: String, CodingKey { case filePath = "file_path" }
+}
+
 struct Credits: Codable {
     let cast: [CastMember]?
 }
@@ -228,12 +248,4 @@ struct CastMember: Codable, Identifiable, Hashable {
 
 struct VideoList: Codable {
     let results: [Video]
-}
-
-struct Video: Codable, Identifiable, Hashable {
-    let id: String
-    let key: String
-    let name: String
-    let site: String
-    let type: String
 }

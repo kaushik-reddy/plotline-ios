@@ -13,6 +13,7 @@ struct ProfileView: View {
     @State private var model = ProfileModel()
     @State private var connectCode = ""
     @State private var working = false
+    @State private var showImport = false
 
     var body: some View {
         ScrollView {
@@ -25,6 +26,7 @@ struct ProfileView: View {
                 if !model.favorites.isEmpty { rail("Favorites", model.favorites) }
                 if !model.upNext.isEmpty { rail("Up Next", model.upNext) }
                 breakdown
+                importCard
                 syncCard
                 regionCard
                 Color.clear.frame(height: 20)
@@ -35,6 +37,25 @@ struct ProfileView: View {
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load(library: library, progress: progress, ratings: ratings) }
+        .sheet(isPresented: $showImport) { ImportView() }
+    }
+
+    private var importCard: some View {
+        Button { showImport = true } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "square.and.arrow.down").font(.system(size: 18)).foregroundStyle(Theme.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Import history").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.text)
+                    Text("From an IMDb or Letterboxd CSV").font(.system(size: 12)).foregroundStyle(Theme.muted)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(Theme.faint)
+            }
+            .padding(14)
+            .background(Theme.panel, in: RoundedRectangle(cornerRadius: Theme.radius))
+            .overlay(RoundedRectangle(cornerRadius: Theme.radius).stroke(Theme.line, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Hero + stats

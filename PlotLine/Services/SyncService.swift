@@ -181,6 +181,10 @@ final class SyncService {
         LibraryStore.shared.rehydrate()
         ProgressStore.shared.rehydrate()
         RatingStore.shared.rehydrate()
+        CommentsStore.shared.rehydrate()
+        RewatchStore.shared.rehydrate()
+        PostersStore.shared.rehydrate()
+        ReviewsStore.shared.rehydrate()
     }
 
     private func jsonString(_ obj: [String: String]) -> String? {

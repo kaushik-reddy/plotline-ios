@@ -18,6 +18,11 @@ struct DetailView: View {
     @State private var showRateSheet = false
     @State private var seasonSheet: SeasonSummary?
     @State private var videoKey: VideoKey?
+    @State private var posters = PostersStore.shared
+    @State private var rewatch = RewatchStore.shared
+    @State private var reviews = ReviewsStore.shared
+    @State private var showPosterSheet = false
+    @State private var showReviewsSheet = false
 
     private var entry: LibEntry? { library.entry(media, id) }
 
@@ -27,6 +32,7 @@ struct DetailView: View {
                 VStack(alignment: .leading, spacing: 22) {
                     hero(d)
                     actionRow
+                    secondaryActions(d)
                     liveActivityButton(d)
                     ratingsRow(d)
                     if let overview = d.overview, !overview.isEmpty {
@@ -77,13 +83,21 @@ struct DetailView: View {
         .sheet(item: $videoKey) { v in
             VideoSheet(key: v.key)
         }
+        .sheet(isPresented: $showPosterSheet) {
+            PosterPickerSheet(media: media, id: id,
+                              posters: model.detail?.images?.posters?.map(\.filePath) ?? [model.detail?.posterPath].compactMap { $0 },
+                              backdrops: model.detail?.images?.backdrops?.map(\.filePath) ?? [model.detail?.backdropPath].compactMap { $0 })
+        }
+        .sheet(isPresented: $showReviewsSheet) {
+            ReviewSheet(media: media, id: id, isTv: media == .tv)
+        }
     }
 
     // MARK: Hero
 
     private func hero(_ d: TitleDetail) -> some View {
         ZStack(alignment: .bottomLeading) {
-            RemoteImage(path: d.backdropPath ?? d.posterPath, size: "w780")
+            RemoteImage(path: posters.override(media, id, "backdrop") ?? d.backdropPath ?? d.posterPath, size: "w780")
                 .frame(height: 320)
                 .clipped()
                 .overlay(
@@ -91,11 +105,14 @@ struct DetailView: View {
                                    startPoint: .top, endPoint: .bottom)
                 )
             HStack(alignment: .bottom, spacing: 14) {
-                RemoteImage(path: d.posterPath, size: "w342")
-                    .frame(width: 96, height: 96 / Theme.posterAspect)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.radius))
-                    .overlay(RoundedRectangle(cornerRadius: Theme.radius).stroke(Theme.lineStrong, lineWidth: 1))
-                    .shadow(color: .black.opacity(0.6), radius: 10, y: 6)
+                Button { showPosterSheet = true } label: {
+                    RemoteImage(path: posters.override(media, id, "poster") ?? d.posterPath, size: "w342")
+                        .frame(width: 96, height: 96 / Theme.posterAspect)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radius))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.radius).stroke(Theme.lineStrong, lineWidth: 1))
+                        .shadow(color: .black.opacity(0.6), radius: 10, y: 6)
+                }
+                .buttonStyle(.plain)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(d.displayTitle)
                         .font(.system(size: 24, weight: .heavy))
@@ -104,6 +121,13 @@ struct DetailView: View {
                     Text(metaLine(d))
                         .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(.white.opacity(0.75))
+                    if rewatch.count(media, id) > 0 {
+                        Text("↻ Watched \(rewatch.count(media, id) + 1)×")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color(hex: 0xA06BFF))
+                            .padding(.horizontal, 7).padding(.vertical, 3)
+                            .background(Color(hex: 0xA06BFF).opacity(0.18), in: Capsule())
+                    }
                 }
                 Spacer()
             }
@@ -180,6 +204,43 @@ struct DetailView: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
+    }
+
+    private func secondaryActions(_ d: TitleDetail) -> some View {
+        HStack(spacing: 10) {
+            Button { showReviewsSheet = true } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "square.and.pencil")
+                    Text(reviews.count(media, id) > 0 ? "Reviews · \(reviews.count(media, id))" : "Reviews")
+                }
+                .font(.system(size: 13, weight: .bold))
+                .frame(maxWidth: .infinity).padding(.vertical, 12)
+                .background(Theme.panelRaised, in: RoundedRectangle(cornerRadius: Theme.radius))
+                .overlay(RoundedRectangle(cornerRadius: Theme.radius).stroke(reviews.count(media, id) > 0 ? Theme.green : Theme.line, lineWidth: 1))
+                .foregroundStyle(Theme.text)
+            }
+            if entry?.status == .completed || entry?.status == .caughtup || rewatch.count(media, id) > 0 {
+                Button { startRewatch() } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.clockwise")
+                        Text(rewatch.count(media, id) > 0 ? "Rewatch · \(rewatch.count(media, id))×" : "Rewatch")
+                    }
+                    .font(.system(size: 13, weight: .bold))
+                    .frame(maxWidth: .infinity).padding(.vertical, 12)
+                    .background(Color(hex: 0xA06BFF).opacity(0.18), in: RoundedRectangle(cornerRadius: Theme.radius))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.radius).stroke(Color(hex: 0xA06BFF), lineWidth: 1))
+                    .foregroundStyle(Color(hex: 0xA06BFF))
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+    }
+
+    private func startRewatch() {
+        rewatch.increment(media, id)
+        if media == .tv { ProgressStore.shared.clearShow(id) }
+        library.setStatus(media, String(id), .watching)
     }
 
     // MARK: Live Activity (Dynamic Island + Lock Screen)
@@ -408,7 +469,7 @@ final class DetailModel {
     @MainActor
     func load(media: MediaKind, id: Int) async {
         if detail != nil { return }
-        let q = "append_to_response=credits,videos,recommendations,similar,external_ids"
+        let q = "append_to_response=credits,videos,recommendations,similar,external_ids,images&include_image_language=en,null"
         detail = await TMDBService.shared.get("/\(media.rawValue)/\(id)", q: q, as: TitleDetail.self)
     }
 }
