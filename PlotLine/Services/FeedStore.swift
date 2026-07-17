@@ -50,38 +50,38 @@ final class FeedStore {
     private static let frame = Persona(name: "Frame by Frame", handle: "framebyframe", seed: "Frame")
 
     private(set) var posts: [FeedPost] = [
-        FeedPost(id: "p1", persona: Self.nova, media: .tv, tmdbId: 95396, titleName: "Severance",
+        FeedPost(id: "p1", persona: FeedStore.nova, media: .tv, tmdbId: 95396, titleName: "Severance",
                  scopeLabel: "Episode · S2 E3", rating: 9, text: "The restraint in this episode is unreal. Every quiet frame feels like it is hiding a second story.",
                  when: "12m", tag: "#Severance", inFollowing: true),
-        FeedPost(id: "p2", persona: Self.rahul, media: .movie, tmdbId: 872585, titleName: "Oppenheimer",
+        FeedPost(id: "p2", persona: FeedStore.rahul, media: .movie, tmdbId: 872585, titleName: "Oppenheimer",
                  scopeLabel: "Movie", rating: 8, text: "A huge film that still finds room for guilt, ego and consequence. The sound design deserves its own rating.",
                  when: "38m", tag: "#Oppenheimer", inFollowing: true),
-        FeedPost(id: "p3", persona: Self.bug, media: .tv, tmdbId: 125988, titleName: "Silo",
+        FeedPost(id: "p3", persona: FeedStore.bug, media: .tv, tmdbId: 125988, titleName: "Silo",
                  scopeLabel: "Episode · S1 E6", rating: 9, text: "That final reveal changed how I read every conversation leading up to it. Proper slow-burn payoff.",
                  when: "1h", tag: "#Silo", inFollowing: true),
-        FeedPost(id: "p4", persona: Self.nova, media: .tv, tmdbId: 100088, titleName: "The Last of Us",
+        FeedPost(id: "p4", persona: FeedStore.nova, media: .tv, tmdbId: 100088, titleName: "The Last of Us",
                  scopeLabel: "Full series", rating: 9, text: "A brutal adaptation that understands the quiet moments are what make the violence matter.",
                  when: "5h", tag: "#TheLastOfUs", inFollowing: true),
-        FeedPost(id: "p5", persona: Self.rahul, media: .movie, tmdbId: 693134, titleName: "Dune: Part Two",
+        FeedPost(id: "p5", persona: FeedStore.rahul, media: .movie, tmdbId: 693134, titleName: "Dune: Part Two",
                  scopeLabel: "Movie", rating: 9, text: "Scale, rhythm, and confidence. The arena sequence alone is worth seeing on the largest screen possible.",
                  when: "8h", tag: "#DunePartTwo", inFollowing: false),
-        FeedPost(id: "p6", persona: Self.geek, media: .tv, tmdbId: 136315, titleName: "The Bear",
+        FeedPost(id: "p6", persona: FeedStore.geek, media: .tv, tmdbId: 136315, titleName: "The Bear",
                  scopeLabel: "Full series", rating: 8, text: "Chaotic, tender, exhausting — somehow exactly like being in a real kitchen with people you love.",
                  when: "1d", tag: "#TheBear", inFollowing: false),
-        FeedPost(id: "p7", persona: Self.frame, media: .tv, tmdbId: 94997, titleName: "House of the Dragon",
+        FeedPost(id: "p7", persona: FeedStore.frame, media: .tv, tmdbId: 94997, titleName: "House of the Dragon",
                  scopeLabel: "Season 2", rating: 8, text: "The politics finally click into place. Every alliance feels one bad night away from collapse.",
                  when: "1d", tag: "#HouseOfTheDragon", inFollowing: false),
     ]
 
     private var seededReplies: [String: [FeedReply]] = [
         "p1": [
-            FeedReply(id: "r1", postId: "p1", persona: Self.rahul, text: "The blocking in the hallway scene was perfect.", when: "8m"),
+            FeedReply(id: "r1", postId: "p1", persona: FeedStore.rahul, text: "The blocking in the hallway scene was perfect.", when: "8m"),
         ],
         "p2": [
-            FeedReply(id: "r2", postId: "p2", persona: Self.geek, text: "The sound dropping out before the test is still chilling.", when: "25m"),
+            FeedReply(id: "r2", postId: "p2", persona: FeedStore.geek, text: "The sound dropping out before the test is still chilling.", when: "25m"),
         ],
         "p3": [
-            FeedReply(id: "r3", postId: "p3", persona: Self.frame, text: "Silo rewards patience better than almost anything airing now.", when: "42m"),
+            FeedReply(id: "r3", postId: "p3", persona: FeedStore.frame, text: "Silo rewards patience better than almost anything airing now.", when: "42m"),
         ],
     ]
 
