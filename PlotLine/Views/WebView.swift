@@ -171,20 +171,33 @@ struct WebView: UIViewRepresentable {
             let progress = (body["progress"] as? Double) ?? 0
             let subtitle = (body["subtitle"] as? String) ?? ""
             let status = (body["status"] as? String) ?? "Watching"
+            // Countdown target (ms since epoch) — presence switches the activity to countdown mode.
+            let target = (body["targetDate"] as? Double).map { Date(timeIntervalSince1970: $0 / 1000) }
 
             switch type {
             case "start":
-                LiveActivityManager.shared.start(title: title, media: media, id: id,
-                                                 posterPath: poster, progress: progress,
-                                                 subtitle: subtitle, status: status)
+                if let target {
+                    LiveActivityManager.shared.startCountdown(title: title, media: media, id: id,
+                                                              posterPath: poster, targetDate: target, subtitle: subtitle)
+                } else {
+                    LiveActivityManager.shared.start(title: title, media: media, id: id,
+                                                     posterPath: poster, progress: progress,
+                                                     subtitle: subtitle, status: status)
+                }
             case "update":
-                Task { await LiveActivityManager.shared.update(id: id, progress: progress, subtitle: subtitle, status: status) }
+                if let target {
+                    LiveActivityManager.shared.startCountdown(title: title, media: media, id: id,
+                                                              posterPath: poster, targetDate: target, subtitle: subtitle)
+                } else {
+                    Task { await LiveActivityManager.shared.update(id: id, progress: progress, subtitle: subtitle, status: status) }
+                }
             case "end":
                 Task { await LiveActivityManager.shared.end(id: id) }
             case "notify":
                 let when = (body["at"] as? Double).map { Date(timeIntervalSince1970: $0 / 1000) }
                     ?? Date().addingTimeInterval(60)
-                NotificationManager.shared.schedule(id: "\(media.rawValue)_\(id)", title: title, body: subtitle, at: when)
+                let notifId = (body["notifId"] as? String) ?? "\(media.rawValue)_\(id)"
+                NotificationManager.shared.schedule(id: notifId, title: title, body: subtitle, at: when)
             default:
                 break
             }
