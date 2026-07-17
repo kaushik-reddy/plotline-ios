@@ -1,42 +1,83 @@
 # PlotLine — iOS
 
-A native **SwiftUI** app for iPhone (built for **iPhone Air, iOS 26**) that mirrors the
-[PlotLine web app](https://gentle-desert-01c503400.7.azurestaticapps.net): a personal
-movie & TV tracker. Same dark theme and orange accent, same data — it talks to the exact
-same TMDB proxy the website uses, and can sync your library across devices (and with the
-website) using a sync code.
+An iPhone app (built for **iPhone Air, iOS 26**) that is a **true pixel-for-pixel replica**
+of the [PlotLine web app](https://gentle-desert-01c503400.7.azurestaticapps.net). Rather than
+re-implement (and risk missing) any of the website's screens, the app renders the **real
+deployed web app** full-screen in a native `WKWebView`. It *is* the website — same layout,
+same styles, same features, always up to date — wrapped in a native iOS 26 SwiftUI shell.
 
-It also uses native iOS surfaces the website can't:
+On top of that exact web experience, the app adds native iOS surfaces the browser can't:
 
 - **Live Activities** — a “now watching” card on the **Lock Screen**.
 - **Dynamic Island** — compact, minimal and expanded presentations with a live progress ring.
-- **Local notifications** — Lock Screen reminders when a tracked episode drops or a scheduled
-  watch is due (no push server needed).
+- **Local notifications** — Lock Screen reminders for tracked episodes / scheduled watches.
 
-> This is a fresh, hand-written SwiftUI port — not a webview wrapper. Every screen is
-> real native UI, so it feels like an iOS app, not a website in a box.
+These are driven from the web content through a JavaScript bridge (`window.PlotLineNative`).
+
+> Why a WebView? You asked for an exact, nothing-missing replica of the web version. A
+> hand-written native re-build of ~1,800 web modules would inevitably drift from the site.
+> Hosting the real web app guarantees 100% parity and that new website features appear on
+> the phone automatically.
 
 ---
 
 ## What's inside
 
-| Screen | What it does |
+| Piece | Role |
 |---|---|
-| **Home** | Continue Watching rail (live progress), Up Next (your planned titles), Trending / In Theaters / Popular Series discovery rails. |
-| **Explore** | Search (`/search/multi`) + browse rails: Trending, Popular Movies/Series, Top Rated, On The Air, Upcoming. |
-| **Calendar** | *My Calendar* (your scheduled titles + tracked shows' next episodes) and *Coming Soon* (upcoming movies), grouped by day. |
-| **Binge** | Your library — filter by media (All / Movies / Shows) and by status, with counts. |
-| **Title detail** | Cinematic hero, meta, TMDb + your PlotLine rating, Add Status, Rate, Seasons, Cast, Recommendations & Similar. |
-| **Profile** | Identity, library stats & breakdown, **cross-device sync** card, and region/timezone picker. |
+| `RootWebView` / `WebView` | Full-screen `WKWebView` rendering the live PlotLine site (pixel-for-pixel), with a branded splash and offline retry. |
+| `window.PlotLineNative` bridge | JS API injected into the page so the web app can start/update/end **Live Activities** and schedule **notifications** natively. |
+| `PlotLineWidgets/` | Widget extension: the Live Activity UI for **Dynamic Island** + **Lock Screen**. |
+| `LiveActivityManager` / `NotificationManager` | Native services the bridge calls into. |
+| `PlotLine/Views/*` (native screens) | A hand-written native SwiftUI version of every screen — **kept in the repo** as a starting point, but not the shell. The WebView supersedes it for exact parity. |
 
-Statuses, colors and the `pl_*` storage keys match the web app, so your data stays
-consistent everywhere.
+---
+
+## Wiring the web app to the native features (optional)
+
+The bridge is ready; the deployed website just doesn't call it yet. To make Live Activities
+fire automatically, add a few no-op-on-desktop calls in the web app, e.g. when a title
+becomes “Watching”:
+
+```js
+// safe on every platform — only does something inside the iOS app
+window.PlotLineNative?.startLiveActivity?.({
+  id: 1396, media: 'tv', title: 'Breaking Bad',
+  posterPath: '/ggFHVNu6YYI5L9pCfOacjizRGt.jpg',
+  progress: 0.35, subtitle: 'S3 E5 · 24 min left', status: 'Watching'
+})
+// …later: window.PlotLineNative?.updateLiveActivity?.({ id: 1396, progress: 0.5, subtitle: '…' })
+// …done:  window.PlotLineNative?.endLiveActivity?.({ id: 1396 })
+```
+
+I have the web source in the workspace, so I can add these hooks whenever you want.
 
 ---
 
 ## Getting it onto your Mac + GitHub
 
 You're on the plan of *clone a repo and open it in Xcode*. Here's the one-time path:
+
+### 1. Publish to GitHub (run once, on your Mac)
+
+Copy this whole `plotline-ios` folder to your Mac, then in Terminal:
+
+```bash
+cd plotline-ios
+chmod +x push-to-github.sh
+./push-to-github.sh
+```
+
+That script creates a **new private repo** `kaushik-reddy/plotline-ios` and pushes
+everything. It needs the GitHub CLI once:
+
+```bash
+brew install gh      # if you don't have Homebrew: https://brew.sh
+gh auth login        # GitHub.com → HTTPS → login with browser
+```
+
+(If you'd rather not use `gh`, you can create an empty `plotline-ios` repo on github.com
+and run: `git init -b main && git add -A && git commit -m "init" && git remote add origin
 
 ### 1. Publish to GitHub (run once, on your Mac)
 
