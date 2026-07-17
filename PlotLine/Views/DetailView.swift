@@ -1,0 +1,314 @@
+import SwiftUI
+
+/// Title detail page (movie or TV) — mirrors the web `/title/:media/:id`. Cinematic hero
+/// with backdrop/poster/logo-style title, meta + status, ratings row with your PlotLine
+/// rating, an action column (Add Status / Rate), plus cast, seasons and recommendations.
+struct DetailView: View {
+    let media: MediaKind
+    let id: Int
+
+    @Environment(LibraryStore.self) private var library
+    @Environment(RatingStore.self) private var ratings
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var model = DetailModel()
+    @State private var showStatusSheet = false
+    @State private var showRateSheet = false
+
+    private var entry: LibEntry? { library.entry(media, id) }
+
+    var body: some View {
+        ScrollView {
+            if let d = model.detail {
+                VStack(alignment: .leading, spacing: 22) {
+                    hero(d)
+                    actionRow
+                    ratingsRow(d)
+                    if let overview = d.overview, !overview.isEmpty {
+                        Text(overview)
+                            .font(.system(size: 14))
+                            .foregroundStyle(Theme.text.opacity(0.85))
+                            .lineSpacing(4)
+                            .padding(.horizontal, 16)
+                    }
+                    if media == .tv, let seasons = d.seasons?.filter({ $0.seasonNumber > 0 }), !seasons.isEmpty {
+                        seasonsRail(d, seasons)
+                    }
+                    if let cast = d.credits?.cast, !cast.isEmpty {
+                        castRail(cast)
+                    }
+                    if let recs = d.recommendations?.results.filter({ $0.posterPath != nil }), !recs.isEmpty {
+                        PosterRail(title: "Recommendations", items: recs)
+                    }
+                    if let sim = d.similar?.results.filter({ $0.posterPath != nil }), !sim.isEmpty {
+                        PosterRail(title: "Similar", items: sim)
+                    }
+                    Color.clear.frame(height: 20)
+                }
+            } else {
+                heroSkeleton
+            }
+        }
+        .background(PageBackground())
+        .ignoresSafeArea(edges: .top)
+        .toolbar(.hidden, for: .navigationBar)
+        .overlay(alignment: .topLeading) { backButton }
+        .task { await model.load(media: media, id: id) }
+        .sheet(isPresented: $showStatusSheet) { statusSheet }
+        .sheet(isPresented: $showRateSheet) { rateSheet }
+    }
+
+    // MARK: Hero
+
+    private func hero(_ d: TitleDetail) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            RemoteImage(path: d.backdropPath ?? d.posterPath, size: "w780")
+                .frame(height: 320)
+                .clipped()
+                .overlay(
+                    LinearGradient(colors: [.clear, .black.opacity(0.4), Theme.bg],
+                                   startPoint: .top, endPoint: .bottom)
+                )
+            HStack(alignment: .bottom, spacing: 14) {
+                RemoteImage(path: d.posterPath, size: "w342")
+                    .frame(width: 96, height: 96 / Theme.posterAspect)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.radius))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.radius).stroke(Theme.lineStrong, lineWidth: 1))
+                    .shadow(color: .black.opacity(0.6), radius: 10, y: 6)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(d.displayTitle)
+                        .font(.system(size: 24, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .lineLimit(3)
+                    Text(metaLine(d))
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.75))
+                }
+                Spacer()
+            }
+            .padding(16)
+        }
+    }
+
+    private func metaLine(_ d: TitleDetail) -> String {
+        var parts: [String] = []
+        if let y = d.year { parts.append(y) }
+        if media == .tv {
+            if let s = d.numberOfSeasons { parts.append("\(s) Season\(s == 1 ? "" : "s")") }
+            if let e = d.numberOfEpisodes { parts.append("\(e) Episodes") }
+        } else if let r = d.runtime, r > 0 {
+            parts.append("\(r / 60)h \(r % 60)m")
+        }
+        if let g = d.genres?.prefix(2).map(\.name), !g.isEmpty { parts.append(g.joined(separator: " · ")) }
+        return parts.joined(separator: "  •  ")
+    }
+
+    private var heroSkeleton: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Shimmer().frame(height: 320)
+            Shimmer().frame(width: 200, height: 22).clipShape(Capsule()).padding(.horizontal, 16)
+        }
+    }
+
+    private var backButton: some View {
+        Button { dismiss() } label: {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(10)
+                .background(.black.opacity(0.5), in: Circle())
+        }
+        .padding(.leading, 14)
+        .padding(.top, 8)
+    }
+
+    // MARK: Actions
+
+    private var actionRow: some View {
+        HStack(spacing: 10) {
+            Button { showStatusSheet = true } label: {
+                HStack(spacing: 8) {
+                    if let entry {
+                        Circle().fill(entry.status.color).frame(width: 8, height: 8)
+                        Text(entry.status.label)
+                    } else {
+                        Image(systemName: "plus")
+                        Text("Add Status")
+                    }
+                }
+                .font(.system(size: 13, weight: .bold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(entry != nil ? entry!.status.color.opacity(0.18) : Theme.panelRaised,
+                            in: RoundedRectangle(cornerRadius: Theme.radius))
+                .overlay(RoundedRectangle(cornerRadius: Theme.radius).stroke(entry?.status.color.opacity(0.5) ?? Theme.line, lineWidth: 1))
+                .foregroundStyle(Theme.text)
+            }
+            Button { showRateSheet = true } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "star.fill").foregroundStyle(Theme.gold)
+                    Text(ratings.rating(media, id).map { String(format: "%.1f", $0) } ?? "Rate")
+                }
+                .font(.system(size: 13, weight: .bold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Theme.panelRaised, in: RoundedRectangle(cornerRadius: Theme.radius))
+                .overlay(RoundedRectangle(cornerRadius: Theme.radius).stroke(Theme.line, lineWidth: 1))
+                .foregroundStyle(Theme.text)
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+    }
+
+    private func ratingsRow(_ d: TitleDetail) -> some View {
+        HStack(spacing: 18) {
+            ratingChip(label: "TMDb", value: d.voteAverage.map { String(format: "%.1f", $0) }, color: Theme.blue)
+            if let mine = ratings.rating(media, id) {
+                ratingChip(label: "PlotLine", value: String(format: "%.1f", mine), color: Theme.green)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private func ratingChip(label: String, value: String?, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(.system(size: 10, weight: .heavy)).tracking(1).foregroundStyle(Theme.faint)
+            Text(value ?? "—").font(.system(size: 17, weight: .bold)).foregroundStyle(color)
+        }
+    }
+
+    // MARK: Rails
+
+    private func seasonsRail(_ d: TitleDetail, _ seasons: [SeasonSummary]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader(title: "Seasons").padding(.horizontal, 16)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(seasons) { s in
+                        VStack(alignment: .leading, spacing: 6) {
+                            RemoteImage(path: s.posterPath ?? d.posterPath, size: "w342")
+                                .frame(width: 120, height: 120 / Theme.posterAspect)
+                                .clipShape(RoundedRectangle(cornerRadius: Theme.radius))
+                                .overlay(RoundedRectangle(cornerRadius: Theme.radius).stroke(Theme.line, lineWidth: 1))
+                            Text(s.name).font(.system(size: 12.5, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                            Text("\(s.episodeCount ?? 0) episodes").font(.system(size: 11)).foregroundStyle(Theme.muted)
+                        }
+                        .frame(width: 120, alignment: .leading)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    private func castRail(_ cast: [CastMember]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader(title: "Cast").padding(.horizontal, 16)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 14) {
+                    ForEach(cast.prefix(20)) { c in
+                        VStack(spacing: 6) {
+                            RemoteImage(path: c.profilePath, size: "w185")
+                                .frame(width: 72, height: 72)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(Theme.line, lineWidth: 1))
+                            Text(c.name).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.text)
+                                .multilineTextAlignment(.center).lineLimit(2).frame(width: 80)
+                            if let ch = c.character {
+                                Text(ch).font(.system(size: 10)).foregroundStyle(Theme.muted)
+                                    .multilineTextAlignment(.center).lineLimit(1).frame(width: 80)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    // MARK: Sheets
+
+    private var statusSheet: some View {
+        NavigationStack {
+            List {
+                ForEach(LibStatus.order) { s in
+                    Button {
+                        library.setStatus(media, String(id), s)
+                        showStatusSheet = false
+                    } label: {
+                        HStack {
+                            Circle().fill(s.color).frame(width: 10, height: 10)
+                            Text(s.label).foregroundStyle(Theme.text)
+                            Spacer()
+                            if entry?.status == s { Image(systemName: "checkmark").foregroundStyle(Theme.orange) }
+                        }
+                    }
+                    .listRowBackground(Theme.panel)
+                }
+                if entry != nil {
+                    Button(role: .destructive) {
+                        library.clear(media, String(id))
+                        showStatusSheet = false
+                    } label: { Text("Remove from library") }
+                        .listRowBackground(Theme.panel)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(Theme.bg)
+            .navigationTitle("Set status")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium])
+        .preferredColorScheme(.dark)
+    }
+
+    private var rateSheet: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Text("Your rating").font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.text)
+                let current = ratings.rating(media, id) ?? 0
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
+                    ForEach(1...10, id: \.self) { n in
+                        Button {
+                            ratings.setQuick(media, id, Double(n))
+                            showRateSheet = false
+                        } label: {
+                            Text("\(n)")
+                                .font(.system(size: 16, weight: .bold))
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(Double(n) <= current ? Theme.green.opacity(0.25) : Theme.panelRaised,
+                                            in: RoundedRectangle(cornerRadius: Theme.radius))
+                                .overlay(RoundedRectangle(cornerRadius: Theme.radius).stroke(Double(n) <= current ? Theme.green : Theme.line, lineWidth: 1))
+                                .foregroundStyle(Theme.text)
+                        }
+                    }
+                }
+                if current > 0 {
+                    Button(role: .destructive) {
+                        ratings.clear(media, id); showRateSheet = false
+                    } label: { Text("Clear rating") }
+                }
+                Spacer()
+            }
+            .padding(20)
+            .background(Theme.bg)
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.height(280)])
+        .preferredColorScheme(.dark)
+    }
+}
+
+@Observable
+final class DetailModel {
+    var detail: TitleDetail?
+
+    @MainActor
+    func load(media: MediaKind, id: Int) async {
+        if detail != nil { return }
+        let q = "append_to_response=credits,videos,recommendations,similar,external_ids"
+        detail = await TMDBService.shared.get("/\(media.rawValue)/\(id)", q: q, as: TitleDetail.self)
+    }
+}
