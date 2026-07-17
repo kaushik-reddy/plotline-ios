@@ -30,6 +30,7 @@ struct WebView: UIViewRepresentable {
 
         let content = WKUserContentController()
         content.add(context.coordinator, name: "plotline")
+        content.addUserScript(WKUserScript(source: Self.fitJS, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         content.addUserScript(WKUserScript(source: Self.bridgeJS, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         config.userContentController = content
 
@@ -42,6 +43,11 @@ struct WebView: UIViewRepresentable {
         web.scrollView.backgroundColor = UIColor(Theme.bg)
         web.scrollView.contentInsetAdjustmentBehavior = .never
         web.scrollView.showsVerticalScrollIndicator = false
+        web.scrollView.showsHorizontalScrollIndicator = false
+        // Lock zoom so a title page can never render "widened" / zoomed-out.
+        web.scrollView.minimumZoomScale = 1
+        web.scrollView.maximumZoomScale = 1
+        web.scrollView.bouncesZoom = false
 
         controller.webView = web
         web.load(URLRequest(url: url))
@@ -51,6 +57,36 @@ struct WebView: UIViewRepresentable {
     func updateUIView(_ web: WKWebView, context: Context) {}
 
     // MARK: Bridge script injected into the page
+
+    /// Keeps the web app locked to the device width so title pages never render "widened".
+    /// Hardens the viewport (no user zoom) and clips any accidental horizontal overflow at the
+    /// React root using `overflow-x: clip`, which — unlike `hidden` — does not break the site's
+    /// `position: fixed`/`sticky` headers.
+    private static let fitJS = """
+    (function () {
+      function setViewport() {
+        var m = document.querySelector('meta[name=viewport]');
+        if (!m) {
+          m = document.createElement('meta');
+          m.setAttribute('name', 'viewport');
+          (document.head || document.documentElement).appendChild(m);
+        }
+        m.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+      }
+      function addStyle() {
+        var css = 'html,body{max-width:100%;overflow-x:clip;-webkit-text-size-adjust:100%;}'
+                + '#root{overflow-x:clip;max-width:100%;}'
+                + 'img,video,svg{max-width:100%;}';
+        var s = document.createElement('style');
+        s.setAttribute('data-plotline-fit', '1');
+        s.textContent = css;
+        (document.head || document.documentElement).appendChild(s);
+      }
+      setViewport();
+      addStyle();
+      document.addEventListener('DOMContentLoaded', function () { setViewport(); addStyle(); });
+    })();
+    """
 
     /// Exposes `window.PlotLineNative.{startLiveActivity,updateLiveActivity,endLiveActivity,notify}`
     /// to the web app. Each call posts a JSON message to the native handler below.
