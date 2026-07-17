@@ -9,6 +9,8 @@ struct DetailView: View {
 
     @Environment(LibraryStore.self) private var library
     @Environment(RatingStore.self) private var ratings
+    @Environment(ProgressStore.self) private var progress
+    @Environment(LiveActivityManager.self) private var live
     @Environment(\.dismiss) private var dismiss
 
     @State private var model = DetailModel()
@@ -23,6 +25,7 @@ struct DetailView: View {
                 VStack(alignment: .leading, spacing: 22) {
                     hero(d)
                     actionRow
+                    liveActivityButton(d)
                     ratingsRow(d)
                     if let overview = d.overview, !overview.isEmpty {
                         Text(overview)
@@ -159,6 +162,47 @@ struct DetailView: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
+    }
+
+    // MARK: Live Activity (Dynamic Island + Lock Screen)
+
+    private func liveActivityButton(_ d: TitleDetail) -> some View {
+        let active = live.isActive(id)
+        return Button {
+            Task {
+                if active {
+                    await live.end(id: id)
+                } else {
+                    let info = watchProgress(d)
+                    live.start(title: d.displayTitle, media: media, id: id,
+                               posterPath: d.posterPath, progress: info.progress, subtitle: info.subtitle)
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: active ? "stop.circle.fill" : "livephoto")
+                Text(active ? "Stop Live Activity" : "Track on Lock Screen")
+            }
+            .font(.system(size: 13, weight: .bold))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(active ? Theme.orange.opacity(0.18) : Theme.panelRaised,
+                        in: RoundedRectangle(cornerRadius: Theme.radius))
+            .overlay(RoundedRectangle(cornerRadius: Theme.radius).stroke(active ? Theme.orange : Theme.line, lineWidth: 1))
+            .foregroundStyle(active ? Theme.orange : Theme.text)
+        }
+        .buttonStyle(.plain)
+        .disabled(!live.isSupported)
+        .padding(.horizontal, 16)
+    }
+
+    /// Current watch progress (0…1) + a caption for the Live Activity.
+    private func watchProgress(_ d: TitleDetail) -> (progress: Double, subtitle: String) {
+        if media == .tv, let total = d.numberOfEpisodes, total > 0 {
+            let watched = progress.watchedCount(id)
+            return (min(Double(watched) / Double(total), 1), "\(watched)/\(total) episodes")
+        }
+        return (0.05, "Just started")
     }
 
     private func ratingsRow(_ d: TitleDetail) -> some View {

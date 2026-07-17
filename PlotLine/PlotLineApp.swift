@@ -12,6 +12,7 @@ struct PlotLineApp: App {
     @State private var region = RegionStore.shared
     @State private var sync = SyncService.shared
     @State private var avatar = ProfileStore_Avatar.shared
+    @State private var live = LiveActivityManager.shared
 
     var body: some Scene {
         WindowGroup {
@@ -22,9 +23,14 @@ struct PlotLineApp: App {
                 .environment(region)
                 .environment(sync)
                 .environment(avatar)
+                .environment(live)
                 .preferredColorScheme(.dark)
                 .tint(Theme.orange)
-                .task { await sync.pullIfLinked() }
+                .task {
+                    await sync.pullIfLinked()
+                    live.syncRunning()
+                    await NotificationManager.shared.requestAuthorization()
+                }
         }
     }
 }

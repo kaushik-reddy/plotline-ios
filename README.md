@@ -1,10 +1,17 @@
 # PlotLine — iOS
 
-A native **SwiftUI** app for iPhone (built for iPhone Air, iOS 17+) that mirrors the
+A native **SwiftUI** app for iPhone (built for **iPhone Air, iOS 26**) that mirrors the
 [PlotLine web app](https://gentle-desert-01c503400.7.azurestaticapps.net): a personal
 movie & TV tracker. Same dark theme and orange accent, same data — it talks to the exact
 same TMDB proxy the website uses, and can sync your library across devices (and with the
 website) using a sync code.
+
+It also uses native iOS surfaces the website can't:
+
+- **Live Activities** — a “now watching” card on the **Lock Screen**.
+- **Dynamic Island** — compact, minimal and expanded presentations with a live progress ring.
+- **Local notifications** — Lock Screen reminders when a tracked episode drops or a scheduled
+  watch is due (no push server needed).
 
 > This is a fresh, hand-written SwiftUI port — not a webview wrapper. Every screen is
 > real native UI, so it feels like an iOS app, not a website in a box.
@@ -77,12 +84,14 @@ just `git pull` + **⌘R**.
 plotline-ios/
 ├─ PlotLine.xcodeproj/          # Xcode project (file-system synchronized — new files auto-compile)
 ├─ push-to-github.sh            # one-command publish to GitHub
+├─ Shared/                      # code shared by app + widget (Live Activity attributes)
+├─ PlotLineWidgets/             # widget extension: Live Activity + Dynamic Island UI + Info.plist
 └─ PlotLine/
    ├─ PlotLineApp.swift         # @main entry, injects the shared stores
    ├─ Theme.swift               # colors ported from the web index.css tokens
    ├─ Assets.xcassets/          # accent color + app-icon slot
    ├─ Models/                   # TMDB Codable models + library models
-   ├─ Services/                 # TMDB proxy client + reactive stores + cross-device sync
+   ├─ Services/                 # TMDB proxy client + stores + sync + Live Activity + notifications
    └─ Views/                    # RootTabView + Home/Explore/Calendar/Binge/Detail/Profile + Components
 ```
 
@@ -105,6 +114,30 @@ under `PlotLine/` is compiled automatically — no need to fiddle with the proje
 No new Azure resources are required.
 
 ---
+
+## Live Activities, Dynamic Island & notifications
+
+- The **PlotLineWidgets** extension renders the Live Activity. On the title detail page tap
+  **Track on Lock Screen** to start it; it appears on the Lock Screen and in the Dynamic
+  Island (tap **Stop Live Activity** to end it). No entitlement or server is required — these
+  are local ActivityKit activities.
+- **Requirements:** a device (or simulator) running **iOS 26**, with a Dynamic Island device
+  (iPhone 15 Pro / iPhone 16 / iPhone Air family) to see the island presentations. Live
+  Activities must be enabled in **Settings ▸ PlotLine**.
+- **Notifications:** the app requests permission on first launch and schedules reminders for
+  your upcoming Calendar events.
+
+## Updating (the weekly one-liner)
+
+After the first setup you never re-clone. To get new code and reinstall:
+
+```bash
+cd plotline-ios
+git pull
+```
+
+Then back in Xcode press **⌘R**. (Xcode auto-reloads the project when `git pull` changes it —
+if it prompts, choose *Revert*/*Keep Xcode version* to accept the pulled project file.)
 
 ## Notes & next steps
 

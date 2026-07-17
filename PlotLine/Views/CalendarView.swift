@@ -173,5 +173,19 @@ final class CalendarModel {
         }
         mine = mineOut.sorted { $0.date < $1.date }
         loading = false
+        scheduleReminders()
+    }
+
+    /// Schedule local "live" notifications for the next few personal events, so you get a
+    /// Lock Screen reminder when an episode drops or a scheduled watch is due.
+    private func scheduleReminders() {
+        for ev in mine.prefix(10) {
+            NotificationManager.shared.schedule(
+                id: "\(ev.ref.media.rawValue)_\(ev.ref.id)_\(Int(ev.date.timeIntervalSince1970))",
+                title: ev.title,
+                body: ev.subtitle,
+                at: ev.date
+            )
+        }
     }
 }
