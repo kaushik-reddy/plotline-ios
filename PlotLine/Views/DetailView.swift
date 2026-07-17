@@ -66,6 +66,7 @@ struct DetailView: View {
                     }
                     Color.clear.frame(height: 20)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 heroSkeleton
             }
@@ -98,6 +99,7 @@ struct DetailView: View {
     private func hero(_ d: TitleDetail) -> some View {
         ZStack(alignment: .bottomLeading) {
             RemoteImage(path: posters.override(media, id, "backdrop") ?? d.backdropPath ?? d.posterPath, size: "w780")
+                .frame(maxWidth: .infinity)
                 .frame(height: 320)
                 .clipped()
                 .overlay(
@@ -150,7 +152,7 @@ struct DetailView: View {
 
     private var heroSkeleton: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Shimmer().frame(height: 320)
+            Shimmer().frame(maxWidth: .infinity).frame(height: 320)
             Shimmer().frame(width: 200, height: 22).clipShape(Capsule()).padding(.horizontal, 16)
         }
     }
