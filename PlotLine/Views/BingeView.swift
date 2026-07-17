@@ -7,14 +7,36 @@ struct BingeView: View {
     @State private var model = BingeModel()
     @State private var media: MediaFilter = .all
     @State private var status: LibStatus? = nil
+    @State private var query = ""
+    @State private var sort: SortOption = .recent
 
     enum MediaFilter: String, CaseIterable { case all = "All", movie = "Movies", tv = "Shows" }
+    enum SortOption: String, CaseIterable {
+        case recent, title, rating, year
+        var label: String {
+            switch self {
+            case .recent: return "Recently added"
+            case .title: return "Title A–Z"
+            case .rating: return "Rating"
+            case .year: return "Newest"
+            }
+        }
+    }
 
     private var filtered: [BingeEntry] {
-        model.entries.filter { e in
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        var list = model.entries.filter { e in
             (media == .all || (media == .movie && e.media == .movie) || (media == .tv && e.media == .tv)) &&
-            (status == nil || e.status == status)
+            (status == nil || e.status == status) &&
+            (q.isEmpty || e.item.displayTitle.lowercased().contains(q))
         }
+        switch sort {
+        case .recent: break // preserve library order
+        case .title: list.sort { $0.item.displayTitle.localizedCaseInsensitiveCompare($1.item.displayTitle) == .orderedAscending }
+        case .rating: list.sort { ($0.item.voteAverage ?? 0) > ($1.item.voteAverage ?? 0) }
+        case .year: list.sort { ($0.item.year ?? "") > ($1.item.year ?? "") }
+        }
+        return list
     }
 
     var body: some View {
@@ -26,6 +48,7 @@ struct BingeView: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 16)
 
+                searchAndSort
                 statusChips
 
                 if model.loading && model.entries.isEmpty {
@@ -51,6 +74,39 @@ struct BingeView: View {
         .background(PageBackground())
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load(library: library) }
+    }
+
+    private var searchAndSort: some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(Theme.muted)
+                TextField("Search your library", text: $query)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .foregroundStyle(Theme.text)
+                if !query.isEmpty {
+                    Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.faint) }
+                }
+            }
+            .padding(.horizontal, 12).padding(.vertical, 10)
+            .background(Theme.panelRaised, in: RoundedRectangle(cornerRadius: Theme.radius))
+            .overlay(RoundedRectangle(cornerRadius: Theme.radius).stroke(Theme.line, lineWidth: 1))
+
+            Menu {
+                ForEach(SortOption.allCases, id: \.self) { s in
+                    Button(s.label) { sort = s }
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.up.arrow.down").font(.system(size: 12, weight: .bold))
+                    Text(sort.label).font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(Theme.text)
+                .padding(.horizontal, 12).padding(.vertical, 10)
+                .background(Theme.panel, in: RoundedRectangle(cornerRadius: Theme.radius))
+                .overlay(RoundedRectangle(cornerRadius: Theme.radius).stroke(Theme.line, lineWidth: 1))
+            }
+        }
+        .padding(.horizontal, 16)
     }
 
     private var statusChips: some View {
