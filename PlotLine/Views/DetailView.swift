@@ -16,6 +16,8 @@ struct DetailView: View {
     @State private var model = DetailModel()
     @State private var showStatusSheet = false
     @State private var showRateSheet = false
+    @State private var seasonSheet: SeasonSummary?
+    @State private var videoKey: VideoKey?
 
     private var entry: LibEntry? { library.entry(media, id) }
 
@@ -34,8 +36,18 @@ struct DetailView: View {
                             .lineSpacing(4)
                             .padding(.horizontal, 16)
                     }
+                    if media == .tv {
+                        EpisodeTimelineView(detail: d)
+                    }
                     if media == .tv, let seasons = d.seasons?.filter({ $0.seasonNumber > 0 }), !seasons.isEmpty {
                         seasonsRail(d, seasons)
+                    }
+                    CommunityStatusView(media: media, id: id, voteCount: d.voteCount ?? 0)
+                    if media == .tv, let seasons = d.seasons?.filter({ $0.seasonNumber > 0 }), !seasons.isEmpty {
+                        EpisodeRatingMap(showId: id, seasons: seasons)
+                    }
+                    if let videos = d.videos?.results.filter({ $0.site == "YouTube" }), !videos.isEmpty {
+                        videosRail(videos)
                     }
                     if let cast = d.credits?.cast, !cast.isEmpty {
                         castRail(cast)
@@ -59,6 +71,12 @@ struct DetailView: View {
         .task { await model.load(media: media, id: id) }
         .sheet(isPresented: $showStatusSheet) { statusSheet }
         .sheet(isPresented: $showRateSheet) { rateSheet }
+        .sheet(item: $seasonSheet) { season in
+            SeasonPlaygroundView(showId: id, showName: model.detail?.displayTitle ?? "", season: season, posterFallback: model.detail?.posterPath)
+        }
+        .sheet(item: $videoKey) { v in
+            VideoSheet(key: v.key)
+        }
     }
 
     // MARK: Hero
@@ -231,15 +249,47 @@ struct DetailView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(seasons) { s in
-                        VStack(alignment: .leading, spacing: 6) {
-                            RemoteImage(path: s.posterPath ?? d.posterPath, size: "w342")
-                                .frame(width: 120, height: 120 / Theme.posterAspect)
+                        Button { seasonSheet = s } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                RemoteImage(path: s.posterPath ?? d.posterPath, size: "w342")
+                                    .frame(width: 120, height: 120 / Theme.posterAspect)
+                                    .clipShape(RoundedRectangle(cornerRadius: Theme.radius))
+                                    .overlay(RoundedRectangle(cornerRadius: Theme.radius).stroke(Theme.line, lineWidth: 1))
+                                Text(s.name).font(.system(size: 12.5, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                                Text("\(s.episodeCount ?? 0) episodes").font(.system(size: 11)).foregroundStyle(Theme.muted)
+                            }
+                            .frame(width: 120, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    private func videosRail(_ videos: [Video]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader(title: "Videos & Trailers").padding(.horizontal, 16)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(videos.prefix(12)) { v in
+                        Button { videoKey = VideoKey(key: v.key) } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                ZStack {
+                                    AsyncImage(url: URL(string: "https://img.youtube.com/vi/\(v.key)/hqdefault.jpg")) { phase in
+                                        if let img = phase.image { img.resizable().aspectRatio(contentMode: .fill) }
+                                        else { Theme.panelRaised }
+                                    }
+                                    .frame(width: 220, height: 124).clipped()
+                                    Image(systemName: "play.circle.fill").font(.system(size: 34)).foregroundStyle(.white.opacity(0.9))
+                                }
                                 .clipShape(RoundedRectangle(cornerRadius: Theme.radius))
                                 .overlay(RoundedRectangle(cornerRadius: Theme.radius).stroke(Theme.line, lineWidth: 1))
-                            Text(s.name).font(.system(size: 12.5, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
-                            Text("\(s.episodeCount ?? 0) episodes").font(.system(size: 11)).foregroundStyle(Theme.muted)
+                                Text(v.name).font(.system(size: 12)).foregroundStyle(Theme.text).lineLimit(1).frame(width: 220, alignment: .leading)
+                            }
                         }
-                        .frame(width: 120, alignment: .leading)
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -343,6 +393,12 @@ struct DetailView: View {
         .presentationDetents([.height(280)])
         .preferredColorScheme(.dark)
     }
+}
+
+/// Identifiable wrapper so a YouTube key can drive a `.sheet(item:)`.
+struct VideoKey: Identifiable {
+    let id = UUID()
+    let key: String
 }
 
 @Observable

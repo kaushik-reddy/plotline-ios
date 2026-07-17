@@ -53,6 +53,16 @@ final class ProgressStore {
         persist()
     }
 
+    func setSkipped(_ showId: Int, _ s: Int, _ e: Int, _ skipped: Bool) {
+        var map = shows[String(showId)] ?? [:]
+        var st = map[Self.epKey(s, e)] ?? EpState()
+        st.skipped = skipped
+        if skipped { st.watched = false; st.frac = 0 }
+        map[Self.epKey(s, e)] = st
+        shows[String(showId)] = map
+        persist()
+    }
+
     func clearShow(_ showId: Int) {
         shows[String(showId)] = nil
         persist()
