@@ -1,24 +1,35 @@
 import SwiftUI
 
-/// App entry point.
-///
-/// The UI is the **real PlotLine web app** rendered full-screen in a `WKWebView`
-/// (`RootWebView`) — a true pixel-for-pixel replica of the website, with nothing missing,
-/// because it *is* the same web app. Native iOS 26 features (Live Activities, Dynamic Island,
-/// local notifications) are layered on via a JavaScript bridge (`window.PlotLineNative`).
-///
-/// The hand-written native SwiftUI screens (`RootTabView`, `HomeView`, …) remain in the repo
-/// but are no longer the shell; the WebView supersedes them for exact web parity.
+/// App entry point — a fully **native** SwiftUI rebuild of the PlotLine web app (no WebView).
+/// A dark themed shell with a bottom tab bar (Home, Explore, Calendar, Binge) plus a Profile
+/// destination reached via the header avatar. Native iOS 26 extras (Live Activities, Dynamic
+/// Island, local notifications) are wired directly into the native screens.
 @main
 struct PlotLineApp: App {
+    @State private var library = LibraryStore.shared
+    @State private var progress = ProgressStore.shared
+    @State private var ratings = RatingStore.shared
+    @State private var region = RegionStore.shared
+    @State private var sync = SyncService.shared
+    @State private var avatar = ProfileStore_Avatar.shared
     @State private var live = LiveActivityManager.shared
+    @State private var feed = FeedStore.shared
 
     var body: some Scene {
         WindowGroup {
-            RootWebView()
+            RootTabView()
+                .environment(library)
+                .environment(progress)
+                .environment(ratings)
+                .environment(region)
+                .environment(sync)
+                .environment(avatar)
+                .environment(live)
+                .environment(feed)
                 .preferredColorScheme(.dark)
                 .tint(Theme.orange)
                 .task {
+                    await sync.pullIfLinked()
                     live.syncRunning()
                     await NotificationManager.shared.requestAuthorization()
                 }
